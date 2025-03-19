@@ -1,4 +1,4 @@
-name: CI/CD Multi-Stage Pipeline with Docker Hub & ArgoCD
+name: Deploy Python Flask App to EKS
 
 on:
   push:
@@ -9,25 +9,34 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-
       - name: Log in to Docker Hub
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+        run: echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
 
-      - name: Build Docker Image
+      - name: Build Docker image
+        run: docker build -t my-dockerhub-username/my-python-app:latest .
+
+      - name: Push Docker image
+        run: docker push my-dockerhub-username/my-python-app:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure AWS CLI
         run: |
-          IMAGE_NAME=${{ secrets.DOCKER_USERNAME }}/my-app:latest
-          docker build -t $IMAGE_NAME .
-          docker tag $IMAGE_NAME ${{ secrets.DOCKER_USERNAME }}/my-app:${{ github.sha }}
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws configure set default.region us-east-2
 
-      - name: Save Docker Image as an Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-image
-          path: |
-            ${{ secrets.DOCKER_USERNAME }}/my-app:latest
-            ${{ secrets.DOCKER_USERNAME }}/my-app:${{ github.sha }}
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig --name my-eks-cluster
+          kubectl get nodes
+
+      - name: Sync ArgoCD
+        run: |
+          argocd app sync my-python-app
+          argocd app wait my-python-app --health
