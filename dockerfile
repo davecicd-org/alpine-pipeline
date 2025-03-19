@@ -1,29 +1,25 @@
-# Stage 1: Build stage
-FROM node:18-alpine AS build
+# Base image for building
+FROM python:3.10 AS builder
 
-# Set working directory in the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package.json package-lock.json ./
+# Copy and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Install dependencies
-RUN npm install
+# Production stage
+FROM python:3.10-slim
+WORKDIR /app
 
-# Copy all the application files into the container
-COPY . .
+# Copy installed dependencies from builder stage
+COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/bin/gunicorn /usr/local/bin/gunicorn
 
-# Build the application (for example, React app)
-RUN npm run build
+# Copy application files
+COPY app /app
 
-# Stage 2: Production stage
-FROM nginx:alpine
+# Expose port
+EXPOSE 5000
 
-# Copy the build folder from the previous build stage
-COPY --from=build /app/build /usr/share/nginx/html
-
-# Expose the port the app will be available on
-EXPOSE 80
-
-# Start Nginx server
-CMD ["nginx", "-g", "daemon off;"]
+# Command to run the app using Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "main:app"]
