@@ -25,7 +25,7 @@ jobs:
           docker tag $IMAGE_NAME ${{ secrets.DOCKER_USERNAME }}/my-app:${{ github.sha }}
 
       - name: Save Docker Image as an Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: |
