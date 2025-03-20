@@ -25,6 +25,7 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/my-python-app:latest
              
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
